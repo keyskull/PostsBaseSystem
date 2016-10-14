@@ -3,56 +3,40 @@
 
 import java.security.Signature
 
+import scala.collection.mutable
 import scala.reflect._
-import akka.event.Logging
 import akka.actor.{Actor, Props}
+import feature.actor.PluginLoaderActor
+import feature.additional.{Plugin, PluginInfo}
+
 /**
   * Created by Cullen Lee on 2016/10/9.
   */
 
-
 package object feature{
-  import scala.collection.mutable
-  import feature.Feature
-  private class FeatureActor extends Actor {
-    val log = Logging(context.system, this)
-    private val enabledFeatureSet: mutable.Set[Feature[_]] = mutable.Set[Feature[_]]()
-    import java.security.Signature
-    def receive = {
-      case i: Feature[_]  => // enable
-        i.init
-        enabledFeatureSet += i
-        log.info(s"enabled ${i.getBaseInfo.name}.")
-      case signature :Signature => // disable
-        enabledFeatureSet.find(f => f.getBaseInfo.signature equals signature) match {
-          case Some(s) =>
-            enabledFeatureSet.remove(s)
-            s.disable
-            log.debug(s"disable ${s.getBaseInfo.name} success.")
-        }
-    }
-  }
-  private val featureActor = Launch.system.actorOf(Props[FeatureActor], "FeatureActor")
-  private val featureList: mutable.MutableList[Feature[_]] = new mutable.MutableList[Feature[_]]
+  private val featureActorProps = Props[PluginLoaderActor]
+  private val featureActorRef = Launch.system.actorOf(featureActorProps, "FeatureActor")
 
-  def add[T <: Feature[_] : ClassTag]: Unit = {
+  private val localFeatureList: mutable.MutableList[Plugin] = new mutable.MutableList[Plugin]
+
+  def load[T <: Plugin : ClassTag](plugin:Class[T]): Unit = {
     try {
-      val _feature =  classTag[T].runtimeClass.newInstance.asInstanceOf[Feature[_]]
-      featureList += _feature
+      // Auth this class can be instantiation.
+      val _feature =  plugin.newInstance.asInstanceOf[Plugin]
+      localFeatureList += _feature
     } catch {
-      case ex =>
-        return
+      case ex => featureActorProps.actorClass().asInstanceOf[PluginLoaderActor].log.error(ex,"Load class error.")
     }
   }
 
-  def getFeatureInfo():List[(BaseInfo,String)]= featureList.map(d=>(d.getBaseInfo,d.getDescription)).toList
+  def getFeatureInfo():List[(PluginInfo,String)]= localFeatureList.map(d=>(d.getPluginInfo,d.getDescription)).toList
 
   def enable(number:Int):Unit ={
-    featureActor ! featureList(number)
+    featureActorRef ! localFeatureList(number)
   }
 
   def disable(signature :Signature):Unit ={
-    featureActor ! signature
+    featureActorRef ! signature
   }
 
 }
