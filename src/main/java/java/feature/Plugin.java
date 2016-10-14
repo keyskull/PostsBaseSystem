@@ -1,6 +1,5 @@
 package java.feature;
 
-import feature.Additional;
 import feature.additional.PluginInfo;
 
 import java.util.ArrayList;
@@ -9,7 +8,7 @@ import java.util.ArrayList;
  * Created by Cullen Lee on 2016/10/14.
  */
 
-interface _Plugin extends Additional {
+interface _Plugin {
 
     void init();
 
@@ -27,10 +26,10 @@ public abstract class Plugin implements _Plugin {
     /**
      * @Override this value to support your interface for any other Plugin ues it.
      */
-    protected Api getApi() {
+    public Api getApi() {
         return new Api() {
             @Override
-            PluginInfo getPluginInfo() {
+            public PluginInfo getPluginInfo() {
                 return Plugin.this.pluginInfo();
             }
         };

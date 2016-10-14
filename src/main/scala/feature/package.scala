@@ -1,6 +1,8 @@
 
 
 
+import java.io.{File, FileFilter}
+import java.net.URLClassLoader
 import java.security.Signature
 
 import scala.collection.mutable
@@ -16,17 +18,22 @@ import feature.additional.{Plugin, PluginInfo}
 package object feature{
   private val featureActorProps = Props[PluginLoaderActor]
   private val featureActorRef = Launch.system.actorOf(featureActorProps, "FeatureActor")
-
-  private val localFeatureList: mutable.MutableList[Plugin] = new mutable.MutableList[Plugin]
-
-  def load[T <: Plugin : ClassTag](plugin:Class[T]): Unit = {
-    try {
-      // Auth this class can be instantiation.
-      val _feature =  plugin.newInstance.asInstanceOf[Plugin]
-      localFeatureList += _feature
-    } catch {
-      case ex => featureActorProps.actorClass().asInstanceOf[PluginLoaderActor].log.error(ex,"Load class error.")
+  private val pluginPath =new File("plugin")
+  private def localFeatureList: List[Plugin] =try {
+    if (!pluginPath.mkdir()) {
+      val fileArray = pluginPath.listFiles(new FileFilter {
+        override def accept(pathname: File): Boolean = pathname.isFile && pathname.getName.lastIndexOf(".jar") != -1
+      })
+      val classLoader = new URLClassLoader(fileArray map { file => file.toURI.toURL })
+      fileArray
+        .map { file => classLoader.loadClass(file.getName.substring(file.getName.lastIndexOf(".jar"))) }
+        .filter(c => c.isInstanceOf[Plugin]).toSet[Plugin].toList
     }
+    else List[Plugin]()
+  } catch {
+    case ex =>
+      featureActorProps.actorClass().asInstanceOf[PluginLoaderActor].log.error(ex,"Load local file error.")
+      List[Plugin]()
   }
 
   def getFeatureInfo():List[(PluginInfo,String)]= localFeatureList.map(d=>(d.getPluginInfo,d.getDescription)).toList
