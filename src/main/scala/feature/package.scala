@@ -5,10 +5,8 @@ import java.io.{File, FileFilter}
 import java.net.URLClassLoader
 import java.security.Signature
 
-import scala.collection.mutable
-import scala.reflect._
-import akka.actor.{Actor, Props}
-import feature.actor.PluginLoaderActor
+import akka.actor.Props
+import feature.actor.PluginLoaderFSM
 import feature.additional.{Plugin, PluginInfo}
 
 /**
@@ -16,10 +14,10 @@ import feature.additional.{Plugin, PluginInfo}
   */
 
 package object feature{
-  private val featureActorProps = Props[PluginLoaderActor]
-  private val featureActorRef = Launch.system.actorOf(featureActorProps, "FeatureActor")
-  private val pluginPath =new File("plugin")
-  private def localFeatureList: List[Plugin] =try {
+  val featureActorProps = Props[PluginLoaderFSM]
+  val featureActorRef = Launch.system.actorOf(featureActorProps, "FeatureActor")
+  val pluginPath =new File("plugin")
+   def localFeatureList: List[Plugin] =try {
     if (!pluginPath.mkdir()) {
       val fileArray = pluginPath.listFiles(new FileFilter {
         override def accept(pathname: File): Boolean = pathname.isFile && pathname.getName.lastIndexOf(".jar") != -1
@@ -27,12 +25,12 @@ package object feature{
       val classLoader = new URLClassLoader(fileArray map { file => file.toURI.toURL })
       fileArray
         .map { file => classLoader.loadClass(file.getName.substring(file.getName.lastIndexOf(".jar"))) }
-        .filter(c => c.isInstanceOf[Plugin]).toSet[Plugin].toList
+        .filter(c => c.isInstanceOf[Plugin]).map(c=> c.asInstanceOf[Plugin]).toList
     }
     else List[Plugin]()
   } catch {
     case ex =>
-      featureActorProps.actorClass().asInstanceOf[PluginLoaderActor].log.error(ex,"Load local file error.")
+      featureActorProps.actorClass().asInstanceOf[PluginLoaderFSM].log.error(ex,"Load local file error.")
       List[Plugin]()
   }
 

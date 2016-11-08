@@ -1,10 +1,6 @@
 package feature.additional
 
-import java.feature.Api
-
-import feature.{PluginClass, UseOtherPluginApi}
-
-import scala.collection.mutable
+import feature.UseOtherPluginApi
 
 
 /**
