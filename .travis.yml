@@ -1,6 +1,17 @@
 language: scala
-scala:
-   - 2.10.4
-   - 2.11.7
 
-sbt ++$TRAVIS_SCALA_VERSION test
+services:
+  - docker
+
+env:
+  DOCKER_COMPOSE_VERSION: 1.9.0-rc4
+
+before_install:
+  - docker build -t keyskull/PostsBaseSystem .
+  - docker run -d -P 41658:41658  keyskull/PostsBaseSystem -s
+
+
+script:
+  - sbt ++$TRAVIS_SCALA_VERSION test
+
+
